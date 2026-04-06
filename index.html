@@ -367,9 +367,9 @@
   .k-card-text { font-size: 13px; }
   .k-card-foot { display: flex; align-items: center; justify-content: space-between; }
   .k-empty { font-size: 12px; color: var(--text-3); text-align: center; padding: 16px 0; }
-  .k-card-actions { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-top: 4px; border-top: 1px solid var(--border); padding-top: 8px; }
-  .k-move-btn { font-size: 11px; padding: 3px 10px; border: 1px solid var(--border-md); border-radius: 99px; background: none; color: var(--text-2); cursor: pointer; font-family: 'DM Sans', sans-serif; transition: background 0.12s, color 0.12s; }
-  .k-move-btn:hover { background: var(--surface2); color: var(--text); }
+  .k-card-actions { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-top: 6px; border-top: 1px solid var(--border); padding-top: 8px; }
+  .k-move-btn { font-size: 11px; padding: 3px 10px; border: 1px solid var(--border-md); border-radius: 99px; background: none; color: var(--text-2); cursor: pointer; font-family: 'DM Sans', sans-serif; transition: background 0.12s; }
+  .k-move-btn:hover { background: var(--surface2); }
   .k-move-fwd { background: var(--accent-light); color: var(--accent-text); border-color: transparent; font-weight: 500; }
   .k-move-fwd:hover { opacity: 0.85; }
   .k-done-text { text-decoration: line-through; color: var(--text-3); }
@@ -640,12 +640,13 @@ let activeFilter=null;
 let calY=new Date().getFullYear(), calM=new Date().getMonth();
 let selDay=null;
 
-function save() { try { localStorage.setItem('planner_tasks', JSON.stringify(tasks)); localStorage.setItem('planner_nextId', nextId); } catch(e){} }
+function save() { try { localStorage.setItem('planner_tasks', JSON.stringify(tasks)); localStorage.setItem('planner_nextId', String(nextId)); } catch(e){} }
 function load() {
   try {
-    const t=localStorage.getItem('planner_tasks');
-    if(t){ tasks=JSON.parse(t); tasks.forEach(t=>{ if(!t.status) t.status = t.done ? 'done' : 'todo'; }); }
-    const n=localStorage.getItem('planner_nextId'); if(n){nextId=parseInt(n);}
+    const t = localStorage.getItem('planner_tasks');
+    const n = localStorage.getItem('planner_nextId');
+    if (t) { const parsed = JSON.parse(t); if (Array.isArray(parsed) && parsed.length > 0) { tasks = parsed; tasks.forEach(t => { if (!t.status) t.status = t.done ? 'done' : 'todo'; }); } }
+    if (n && !isNaN(parseInt(n))) nextId = parseInt(n);
   } catch(e) {}
 }
 load();
@@ -673,24 +674,29 @@ function filterPrio(p) {
 }
 
 function addTask() {
-  const inp=document.getElementById('task-input');
-  const text=inp.value.trim();
-  if(!text) return;
-  tasks.push({id:nextId++,text,prio:document.getElementById('prio-sel').value,date:document.getElementById('date-sel').value,done:false,status:'todo'});
-  inp.value=''; save(); render();
+  const inp = document.getElementById('task-input');
+  const prioEl = document.getElementById('prio-sel');
+  const dateEl = document.getElementById('date-sel');
+  if (!inp || !prioEl || !dateEl) return;
+  const text = inp.value.trim();
+  if (!text) { inp.focus(); return; }
+  tasks.push({ id: nextId++, text, prio: prioEl.value, date: dateEl.value, done: false, status: 'todo' });
+  inp.value = '';
+  inp.focus();
+  save(); render();
 }
 
-function toggleDone(id) { const t=tasks.find(t=>t.id===id); if(t){t.done=!t.done; t.status=t.done?'done':'todo';} save(); render(); }
+function toggleDone(id) { const t=tasks.find(t=>t.id===id); if(t){ t.done=!t.done; t.status=t.done?'done':'todo'; } save(); render(); }
 function deleteTask(id) { tasks=tasks.filter(t=>t.id!==id); save(); render(); }
 
 function moveTask(id, dir) {
-  const t = tasks.find(t=>t.id===id);
+  const t = tasks.find(t => t.id === id);
   if (!t) return;
-  const order = ['todo','doing','done'];
+  const order = ['todo', 'doing', 'done'];
   const idx = order.indexOf(t.status);
-  const newIdx = idx + dir;
-  if (newIdx < 0 || newIdx > 2) return;
-  t.status = order[newIdx];
+  const next = idx + dir;
+  if (next < 0 || next > 2) return;
+  t.status = order[next];
   t.done = t.status === 'done';
   save(); render();
 }
@@ -738,7 +744,6 @@ function renderLista() {
 }
 
 function renderKanban() {
-  const statusLabel = {todo:'A fazer', doing:'Em andamento', done:'Concluído'};
   const mkCard = t => {
     const canBack = t.status !== 'todo';
     const canFwd  = t.status !== 'done';
@@ -754,10 +759,9 @@ function renderKanban() {
       </div>
     </div>`;
   };
-  const byStatus = s => tasks.filter(t=>t.status===s);
-  document.getElementById('k-todo').innerHTML  = byStatus('todo').map(mkCard).join('')  || '<div class="k-empty">Nenhuma tarefa</div>';
-  document.getElementById('k-doing').innerHTML = byStatus('doing').map(mkCard).join('') || '<div class="k-empty">Nenhuma tarefa</div>';
-  document.getElementById('k-done').innerHTML  = byStatus('done').map(mkCard).join('')  || '<div class="k-empty">Nenhuma tarefa</div>';
+  document.getElementById('k-todo').innerHTML  = tasks.filter(t=>t.status==='todo').map(mkCard).join('')  || '<div class="k-empty">Nenhuma tarefa</div>';
+  document.getElementById('k-doing').innerHTML = tasks.filter(t=>t.status==='doing').map(mkCard).join('') || '<div class="k-empty">Nenhuma tarefa</div>';
+  document.getElementById('k-done').innerHTML  = tasks.filter(t=>t.status==='done').map(mkCard).join('')  || '<div class="k-empty">Nenhuma tarefa</div>';
 }
 
 function changeMonth(d){calM+=d;if(calM>11){calM=0;calY++;}if(calM<0){calM=11;calY--;}selDay=null;renderMensal();}
